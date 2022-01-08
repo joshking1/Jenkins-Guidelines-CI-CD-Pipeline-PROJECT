@@ -31,23 +31,36 @@ PLUGINS
 
 	kubectl (the command line interface (CLI) to run kubectl commands on the GKC cluster) 
 
-Special Commands to run before creating a pipeline script 
-Link: https://github.com/joshking1/Commands_Devop_Pipeline.git 
+SPECIAL COMMAND TO RUN BEFORE CREATING THE DECLARATIVE PIPELINE SCRIPT 
+
+Link: https://github.com/joshking1/Commands_Devop_Pipeline.git  
+
 # Update visudo and assign administration privileges to jenkins user
+
 	sudo vi /etc/sudoers 
 	jenkins ALL=(ALL) NOPASSWD: ALL 
 	sudo useradd jenkins 
 	sudo su - jenkins  
+	
 # Install Docker	sudo apt install docker.io
 	docker --version
+
 # Add jenkins user to Docker group
-	sudo usermod -aG docker jenkins 
+	sudo usermod -aG docker jenkins
+	
 # Install and Setup Kubectl
+
 	curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+	
 	chmod +x ./kubectl 
+	
 	sudo mv ./kubectl /usr/local/bin
+	
 # Verify the kubectl installation
+
 	kubectl version
+	
+STEPS FOR THE JENKINS DECLARATIVE PIPELINE 
 
 Write a declarative Jenkins pipeline script to integrate the necessary tools such as docker, maven etc and include the following stages in your Jenkins build: 
 

@@ -1,0 +1,133 @@
+ADVANCED GROUP CI/CD PIPELINE PROJECT
+
+1.	Provision your Jenkins CI server using terraform 
+
+2.	Allow terraform to have an output.tf file that will make the ip address for the provisioned Jenkins CI server to be made available to you 
+
+3.	SSH to Jenkins server and add visudo permission privileges to Jenkins user 
+
+4.	Checker whether Jenkins user exist            sudo cat /etc/passwd  or sudo tail -5 /etc/passwd 
+
+      If not 
+
+5.	Add Jenkins user - sudo useradd jenkins 
+
+6.	Switch to Jenkins user - sudo su jenkins (we will have two users)  vs sudo su - jenkins ( fully switch to jenkins) 
+
+7.	Add jenkins user to docker Group - to see the logs of jenkins in the docker console/ also be able to run docker commands - sudo usermod -a -G docker jenkins or sudo usermod -aG docker jenkins
+
+8.	Run a CI/CD pipeline using Jenkins CI server from git or bitbucket cloning stage to deploying the application to Google Kubernetes cluster (GKC) stage. 
+
+9.	Use very few plugins and if possible, none. 
+
+PLUGINS 
+
+	Docker plugins/dependencies/downloads 
+
+	Kubernetes continuous deploy (Main purpose: store the GKC credentials (config credentials) - this is going to fail all the time. Why? GKC and other clusters do not recognize the updated Kubernetes continuous deploy plugin which is beyond version 1.0
+	we are going to upload the Kubernetes continuous deploy manually (Advance and upload) 
+
+	Google kubernetes engine plugin 
+
+	kubectl (the command line interface (CLI) to run kubectl commands on the GKC cluster) 
+
+Special Commands to run before creating a pipeline script 
+Link: https://github.com/joshking1/Commands_Devop_Pipeline.git 
+# Update visudo and assign administration privileges to jenkins user
+	sudo vi /etc/sudoers 
+	jenkins ALL=(ALL) NOPASSWD: ALL 
+	sudo useradd jenkins 
+	sudo su - jenkins  
+# Install Docker	sudo apt install docker.io
+	docker --version
+# Add jenkins user to Docker group
+	sudo usermod -aG docker jenkins 
+# Install and Setup Kubectl
+	curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+	chmod +x ./kubectl 
+	sudo mv ./kubectl /usr/local/bin
+# Verify the kubectl installation
+	kubectl version
+
+10.	Write a declarative Jenkins pipeline script to integrate the necessary tools such as docker, maven etc and include the following stages in your Jenkins build: 
+
+11.	Git Clone (try both scm checkout and git:Git pipeline syntax solutions) 
+
+12.	In the company, you will work with private git repository. 
+
+
+13.	Include the credentials for the GitHub (username and password)
+
+14.	Maven clean package (integrate Jenkins with maven to enhance the compilation, linkage, packaging, testing, and building of the Java artifact) then (store the Java artifact in the preferred artifactory)
+
+15.	Docker build (build docker image using docker file in your src git repository url ) src is a short form of source code 
+
+16.	Docker tag (create a repo in the docker hub, give your image appropriate name and run the sh command to build the image) Do not forget the DOT in your command 
+
+17.	Docker list (request Jenkins to list the images available in docker) 
+
+18.	Docker login (allow Jenkins’s login to your dockerhub account by creating pipeline syntax and saving the docker hub password as a SECRET TEXT). Do not forget to include the variable for the password. 
+
+19.	Docker push (push the created image to docker hub with the help of Jenkins) 
+
+DEPLOYMENT STAGE 
+20.	Provision one of the following clusters: 
+
+        GKC (Google Kubernetes cluster) – the best 
+        KOPS (Kubernetes operations) 
+        EKS (Elastic Kubernetes Services)  
+        KUBEADM (centos or ubuntu server on bare metal or premise) 
+        Linode 
+
+21.	Kubernetes deploy with GKC, EKS, KOPS, KUBEADM (deploy the deployment and service manifests with image created by Jenkins to the cluster)
+
+22.	Run the kubectl get deploy to verify the deployment of your manifest 
+
+23.	Run the kubectl get svc to verify the deployment of your load balancer/service manifest
+
+The Entire Declarative Jenkins Pipeline Script from Advanced Group Container Session 
+node {
+
+    stage("Git Clone"){
+        git credentialsId: 'GIT_HUB_CREDENTIALS', url: 'https://github.com/joshking1/k8s-jenkins-aws.git'
+    }
+    stage('Maven Clean Build') {
+        def mavenHome = tool name: "Maven-3.8.4", type: "maven"
+        def mavenCMD = "${mavenHome}/bin/mvn"
+        sh "${mavenCMD} clean package"
+    }
+
+    }
+    stage("Build Docker Image"){
+        sh "docker version"
+        sh "docker build -t king-httpd ."
+    }
+    stage("Docker Image list"){
+
+        sh "docker image list"
+    }
+    stage("Docker Image Tag"){
+
+        sh "docker tag king-httpd josh1991/king-httpd:king-httpd"
+    }
+    
+    stage("Docker Login to Hub Docker"){
+     withCredentials([string(credentialsId: 'DOCKER_HUB_PASSWORD', variable: 'PASSWORD')]){
+        sh "docker login -u josh1991 -p $PASSWORD"
+     }
+     
+    }
+     
+    stage("Docker Image Push"){
+        
+        sh "docker push josh1991/king-httpd:king-httpd"
+    }
+    stage("Google Kubernetes Cluster deploy"){
+        kubernetesDeploy(
+            configs: 'springBootMongo.yml',
+            kubeconfigId: 'KUBERNETES_CLUSTER_CONFIG',
+            enableConfigSubstitution: true 
+        )
+    }
+}
+

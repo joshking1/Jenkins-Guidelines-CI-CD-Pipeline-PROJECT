@@ -14,26 +14,34 @@ Add Jenkins user - sudo useradd jenkins
 
 Switch to Jenkins user - sudo su jenkins (we will have two users)  vs sudo su - jenkins ( fully switch to jenkins) 
 
-Add jenkins user to docker Group - to see the logs of jenkins in the docker console/ also be able to run docker commands - sudo usermod -a -G docker jenkins or sudo usermod -aG docker jenkins
+Add jenkins user to docker Group - to see the logs of jenkins in the docker console/ and also be able to run docker commands - sudo usermod -a -G docker jenkins or sudo usermod -aG docker jenkins
+How to view the jenkins logs in Docker 
+# sudo docker logs -f [container ID]
 
-Run a CI/CD pipeline using Jenkins CI server from git or bitbucket cloning stage to deploying the application to Google Kubernetes cluster (GKC) stage. 
+Run a CI/CD pipeline using Jenkins CI server. 
 
-Use very few plugins and if possible, none. 
+Git source code link to use in the jenkins CI Server: https://github.com/joshking1/spring-boot-mongo-docker.git 
+
+Use very few plugins/downloads and if possible, none. The aim of this project is to write a declarative pipeline script to do the job for you. 
 
 PLUGINS 
 
 	Docker plugins/dependencies/downloads 
 
-	Kubernetes continuous deploy (Main purpose: store the GKC credentials (config credentials) - this is going to fail all the time. Why? GKC and other clusters do not recognize the updated Kubernetes continuous deploy plugin which is beyond version 1.0
-	we are going to upload the Kubernetes continuous deploy manually (Advance and upload) 
+	Kubernetes continuous deploy plugin - (Main purpose  of this plugin is to store the Google Kubernetes Cluster (GKC) credentials (config credentials)
+	The current jenkins kubernetes continous deploy plugin is 2.3.1 version.  
+	Running the deploy (manifests) with the 2.3.1 version is going to fail all the time. 
+	Why? This is because GKC and other clusters, such KOPS, EKS, KUBEADM (bare metal), Linode cluster do not recognize the version 2.3.1
+	
+	Solution - downgrade the kubernetes continuous deploy plugin from versiuon 2.3.1 to version 1.0.0
+	
+	Go to manage jenkins ==> manage plugins ==> Advanced (upload the downgraded kubernetes continuous deploy)  and will be downloaded as usual 
 
-	Google kubernetes engine plugin 
-
-	kubectl (the command line interface (CLI) to run kubectl commands on the GKC cluster) 
+	Google kubernetes engine plugin - this is because were deploying in the GKC
 
 SPECIAL COMMAND TO RUN BEFORE CREATING THE DECLARATIVE PIPELINE SCRIPT 
 
-Link: https://github.com/joshking1/Commands_Devop_Pipeline.git  
+Link: https://github.com/joshking1/Commands_Devop_Pipeline.git ( All the commands are available in this link) 
 
 # Update visudo and assign administration privileges to jenkins user
 
@@ -42,15 +50,19 @@ Link: https://github.com/joshking1/Commands_Devop_Pipeline.git
 	sudo useradd jenkins 
 	sudo su - jenkins  
 	
-# Install Docker	sudo apt install docker.io
+# Install Docker	sudo yum install docker.io    ==> (Amazon linux VMware) 
 	docker --version
 
 # Add jenkins user to Docker group
-	sudo usermod -aG docker jenkins
+	sudo usermod -a -G docker jenkins or sudo usermod -aG docker jenkins
 	
-# Install and Setup Kubectl
+# Install and Setup Kubectl ( why?) ==>  to be able to apply kubectl commands on the cluster ( Kubectl is the cluster command line interface) 
 
-	curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+For people who selected to work with GKC, it is not a must to install the kubectl CLI in your jenkins terminal because you have the google kubernetes engine plugins in your jenkins console 
+
+Commands to install Kubectl CLI 
+
+curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
 	
 	chmod +x ./kubectl 
 	
@@ -60,50 +72,121 @@ Link: https://github.com/joshking1/Commands_Devop_Pipeline.git
 
 	kubectl version
 	
-STEPS FOR THE JENKINS DECLARATIVE PIPELINE 
+	==> should display complete and the version of the kubectl CLI
+	
+STEPS TO SUCCESSFULLY WRITE AND RUN THE DECLARATIVE PIPELINE SCRIPT WITH GIT, GITHUB, DOCKER & MAVEN INTERGRATION 
 
 Write a declarative Jenkins pipeline script to integrate the necessary tools such as docker, maven etc and include the following stages in your Jenkins build: 
 
+STAGE 1 
+
 Git Clone (try both scm checkout and git:Git pipeline syntax solutions) 
 
-In the company, you will work with private git repository. 
+In the company, you will work with a private git repository. 
 
-Include the credentials for the GitHub (username and password)
+You must provide credentials for the GitHub (username and password) and ID which jenkins will use to locate the GIT credentials. An example of such an ID is GIT_HUB_CREDENTIAL
 
-Maven clean package (integrate Jenkins with maven to enhance the compilation, linkage, packaging, testing, and building of the Java artifact) then (store the Java artifact in the preferred artifactory)
+Maven clean build and package (integrate Jenkins with maven to enhance the compilation gathering of the source code), linkage (linking of different files in the source code), packaging, testing, and the building of the Java artifact) ==> (store the Java artifact in the preferred artifactory)
 
-Docker build (build docker image using docker file in your src git repository url ) src is a short form of source code 
+Docker build (build docker image using docker file in your src git repository url ) ==> src is the short form of source code 
 
-Docker tag (create a repo in the docker hub, give your image appropriate name and run the sh command to build the image) Do not forget the DOT in your command 
+Docker tag (create a repo in the docker hub, give your image appropriate name and run the sh command to build the image) ==> Do not forget the DOT in your command 
 
-Docker list (request Jenkins to list the images available in docker) 
+Docker list (request Jenkins to list the images available in docker) ==> sh " docker images" or sh 'docker image list' 
+
+sh meaning in jenkins ==> you use sh to request jenkins to execute the command and if the exit code is = 0, the pipeline continues and is successful, then if the exit code
+is > 0, the pipeline fails. 
 
 Docker login (allow Jenkins’s login to your dockerhub account by creating pipeline syntax and saving the docker hub password as a SECRET TEXT). Do not forget to include the variable for the password. 
 
+Avoid the following variable because ITS CONSIDERED insecure by jenkins 
+
+$ PASSWORD
+
+sh "docker log -u josh1991 -p $PASSWORD"
+
+use variable like $BOOK, CAT, DOG, COW, etc
+
 Docker push (push the created image to docker hub with the help of Jenkins) 
 
-DEPLOYMENT STAGE 
+DEPLOYMENT STAGE - jenkins is going to deploy deployment manifest, and service manifest to the GKC
 
-Provision one of the following clusters: 
+Have at least one of the below clusters: 
 
-        GKC (Google Kubernetes cluster) – the best 
-        KOPS (Kubernetes operations) 
-        EKS (Elastic Kubernetes Services)  
-        KUBEADM (centos or ubuntu server on bare metal or premise) 
-        Linode 
+        GKC (Google Kubernetes cluster) – the best ==> cheapest 
+        KOPS (Kubernetes operations) - aws ==> flat fee of $0.20 per hour on aws  
+        EKS (Elastic Kubernetes Services)  ==> flat fee of $02.0 per hour on aws 
+        KUBEADM (centos or ubuntu server on bare metal or on premise) 
+        Linode cluster 
 
-Kubernetes deploy with GKC, EKS, KOPS, KUBEADM (deploy the deployment and service manifests with image created by Jenkins to the cluster)
+Kubernetes deploy with GKC, EKS, KOPS, KUBEADM (deploy both the (deployment and service manifests) with image created by Jenkins to the cluster)
+
+Deployment manifest - springBootMongo.yml
+
+Link to kubernetese deployment yaml file ==> https://github.com/joshking1/spring-boot-mongo-docker.git
+
+Deploy manifest 
+
+---
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment  # name of the manifest 
+metadata:
+  name: huguette-dev # This is the name of the APP/pods 
+  namespace: monitoring 
+spec:
+  selector:
+    matchLabels:
+      app: huguette-dev # The name of APP/pods 
+  replicas: 1 # tells us the number of pods matching the template. In this case 1 pod/container/application
+  strategy:
+    type: RollingUpdate # bluegreen Canary deployement method 
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+
+  template:
+    metadata:
+      labels:
+        app: huguette-dev
+    spec:
+      containers:
+      - name: huguette-dev
+        image: nginx # This image will be given by the company 
+        imagePullPolicy: Always 
+        ports:
+        - containerPort: 80 # This is the container port
+Service 
+---
+apiVersion: v1
+kind: Service # service manifest 
+metadata:
+  name: huguette-services # load balancer and also expose the pods to the user on internet
+  labels:
+    app: huguette-dev
+spec:
+  selector:
+    app: huguette-dev
+  type: LoadBalancer
+  ports:
+    - port: 80 # container port 
+      targetPort: 80 # same as container port 
+      nodePort: 31300 # the entrance door to the node where the pods are installed. The nodeport ranges from 30000 ro 32767
+      
+Final Stage 
 
 Run the kubectl get deploy to verify the deployment of your manifest 
 
-Run the kubectl get svc to verify the deployment of your load balancer/service manifest
+kubectl get deploy monitoring  
 
-THE ENTIRE DECLARATIVE JENKINS PIPELINE SCRIPT Source:Advanced Group Container Session 
+Run the kubectl get svc to verify the deployment of your load balancer
+
+
+THIS IS THE ENTIRE DECLARATIVE JENKINS PIPELINE SCRIPT  
 
 node {
 
     stage("Git Clone"){
-        git credentialsId: 'GIT_HUB_CREDENTIALS', url: 'https://github.com/joshking1/k8s-jenkins-aws.git'
+        git credentialsId: 'GIT_HUB_CREDENTIALS', url: 'https://github.com/joshking1/spring-boot-mongo-docker.git'
     }
     stage('Maven Clean Build') {
         def mavenHome = tool name: "Maven-3.8.4", type: "maven"

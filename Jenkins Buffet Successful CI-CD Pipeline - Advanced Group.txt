@@ -181,7 +181,7 @@ kubectl get deploy monitoring
 Run the kubectl get svc to verify the deployment of your load balancer
 
 
-THIS IS THE ENTIRE DECLARATIVE JENKINS PIPELINE SCRIPT  
+THIS IS THE ENTIRE SCRIPTED JENKINS PIPELINE SCRIPT  
 
 node {
 
